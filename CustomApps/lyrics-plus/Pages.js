@@ -844,11 +844,14 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 	useEffect(() => {
 		// Function to load the YouTube IFrame API script
 		const loadYouTubeAPI = () => {
+			if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+				setIsScriptLoaded(true);
+				return;
+			}
 			const tag = document.createElement('script');
 			tag.src = 'https://www.youtube.com/iframe_api';
 			window.onYouTubeIframeAPIReady = () => setIsScriptLoaded(true);
 			document.body.appendChild(tag);
-
 		};
 
 		// Function to initialize the YouTube player
@@ -874,18 +877,20 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 		};
 
 		// Load the script if it hasn't been loaded yet
-		if (!isScriptLoaded) {
+		if (!isScriptLoaded)
 			loadYouTubeAPI();
-		} else {
+		else
 			initializePlayer();
-		}
 
-		// Cleanup function to remove the script tag when the component unmounts
 		return () => {
-			const scriptTag = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-			if (scriptTag) {
-				document.body.removeChild(scriptTag);
+			if (isScriptLoaded && playerRef.current && playerRef.current.player) {
+				playerRef.current.player.destroy();
+				playerRef.current = null;
 			}
+			// const scriptTag = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+			// if (scriptTag) {
+			// 	document.body.removeChild(scriptTag);
+			// }
 		};
 	}, [isScriptLoaded]);
 
@@ -906,9 +911,9 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 			if (!data)
 				return;
 			if (data.isPaused)
-				playerRef.current.player?.pauseVideo();
+				playerRef.current?.player?.pauseVideo();
 			else
-				playerRef.current.player?.playVideo();
+				playerRef.current?.player?.playVideo();
 		};
 
 		Spicetify.Player.addEventListener("onplaypause", syncPlayPause);
