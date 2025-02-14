@@ -826,3 +826,107 @@ const VersionSelector = react.memo(({ items, index, callback }) => {
 		)
 	);
 });
+
+const YouTubeVideo = react.memo(({ videoId }) => {
+	const playerRef = useRef(null);
+	const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+	const [position, setPosition] = useState(0);
+
+	useTrackPosition(() => {
+		const newPos = Spicetify.Player.getProgress() / 1000;
+		// Update only every 1000s
+		if (Math.abs(newPos - position) > 1) {
+			setPosition(newPos);
+		}
+	});
+
+	// Load IFrame API and IFrame Player
+	useEffect(() => {
+		// Function to load the YouTube IFrame API script
+		const loadYouTubeAPI = () => {
+			const tag = document.createElement('script');
+			tag.src = 'https://www.youtube.com/iframe_api';
+			window.onYouTubeIframeAPIReady = () => setIsScriptLoaded(true);
+			document.body.appendChild(tag);
+
+		};
+
+		// Function to initialize the YouTube player
+		const initializePlayer = () => {
+			if (window.YT && window.YT.Player) {
+				playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
+					height: '315',
+					width: '560',
+					videoId: videoId,
+					playerVars: {
+						'autoplay': 0,
+						'mute': 1,
+						'rel': 0,
+						'controls': 0,
+						'enablejsapi': 1,
+						'iv_load_policy': 3,
+					},
+					events: {
+						'onReady': (event) => { playerRef.current.player = event.target; },
+					},
+				});
+			}
+		};
+
+		// Load the script if it hasn't been loaded yet
+		if (!isScriptLoaded) {
+			loadYouTubeAPI();
+		} else {
+			initializePlayer();
+		}
+
+		// Cleanup function to remove the script tag when the component unmounts
+		return () => {
+			const scriptTag = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+			if (scriptTag) {
+				document.body.removeChild(scriptTag);
+			}
+		};
+	}, [isScriptLoaded]);
+
+	// Synchronize track progress
+	useEffect(() => {
+		const player = playerRef.current?.player;
+		if (!player)
+			return;
+
+		if (Math.abs(position - player.getCurrentTime()) > 1)
+			playerRef.current?.player?.seekTo(position, !Spicetify.Player.data.isPaused);
+	}, [position]);
+
+	// Synchronize Play/Pause events
+	useEffect(() => {
+		const syncPlayPause = () => {
+			const data = Spicetify.Player.data;
+			if (!data)
+				return;
+			if (data.isPaused)
+				playerRef.current.player?.pauseVideo();
+			else
+				playerRef.current.player?.playVideo();
+		};
+
+		Spicetify.Player.addEventListener("onplaypause", syncPlayPause);
+		return () => Spicetify.Player.removeEventListener("onplaypause", syncPlayPause);
+	});
+
+	return react.createElement("div",
+		{
+			id: `youtube-player-${videoId}`,
+			style: {
+				position: 'absolute',
+				top: 0,
+				left: 0,
+				width: '100%',
+				height: '100%',
+			},
+		}
+	);
+
+});
+
