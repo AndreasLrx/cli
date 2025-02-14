@@ -164,6 +164,7 @@ const emptyState = {
 	musixmatchAvailableTranslations: null,
 	musixmatchTrackId: null,
 	musixmatchTranslationLanguage: null,
+	videoId: null,
 };
 
 let lyricContainerUpdate;
@@ -197,6 +198,7 @@ class LyricsContainer extends react.Component {
 			genius: null,
 			genius2: null,
 			currentLyrics: null,
+			videoId: null,
 			romaji: null,
 			furigana: null,
 			hiragana: null,
@@ -575,6 +577,21 @@ class LyricsContainer extends react.Component {
 				}
 			}
 		}
+		const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
+
+		const params = {
+			key: apiKey,
+			q: `${track.name} ${track.metadata.artist_name} video`,
+		};
+
+		const finalURL =
+			baseURL +
+			Object.keys(params)
+				.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+				.join("&");
+
+		let result = await Spicetify.CosmosAsync.get(finalURL, null);
+		this.state.videoId = result.items?.[0]?.id?.videoId;
 
 		this.lyricsSource(tempState, finalMode);
 
@@ -1143,9 +1160,23 @@ class LyricsContainer extends react.Component {
 					el.onmousewheel = this.onFontSizeChange;
 				},
 			},
-			react.createElement("div", {
-				className: "lyrics-lyricsContainer-LyricsBackground",
-			}),
+			react.createElement("div",
+				{
+					className: 'lyrics-lyricsContainer-LyricsBackground',
+					style: this.state.videoId ? {
+						height: "80vh",
+						position: "sticky",
+						bottom: "0px",
+						zIndex: -1,
+						gridArea: "auto",
+						marginTop: "-80vh",
+					} : {}
+				},
+				this.state.videoId &&
+				react.createElement(YouTubeVideo, {
+					videoId: this.state.videoId
+				})
+			),
 			react.createElement(
 				"div",
 				{
