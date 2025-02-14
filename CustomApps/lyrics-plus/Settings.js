@@ -502,6 +502,22 @@ const corsProxyTemplate = () => {
 	});
 };
 
+const youtubeApiKey = () => {
+	const [apiKey, setApiKey] = react.useState(localStorage.getItem("lyrics-plus:youtube:apikey") || "");
+
+	return react.createElement("input", {
+		placeholder: "Youtube Api Key",
+		value: apiKey,
+		onChange: (event) => {
+			const value = event.target.value;
+			setApiKey(value);
+
+			if (value === "" || !value) return localStorage.removeItem("lyrics-plus:youtube:apikey");
+			localStorage.setItem("lyrics-plus:youtube:apikey", value);
+		},
+	});
+};
+
 const OptionList = ({ type, items, onChange }) => {
 	const [itemList, setItemList] = useState(items);
 	const [, forceUpdate] = useState();
@@ -709,6 +725,22 @@ function openConfig() {
 				reloadLyrics?.();
 			},
 		}),
+		react.createElement("h2", null, "Youtube Music Videos"),
+		react.createElement(ConfigSlider, {
+			name: "Enable music videos",
+			defaultValue: CONFIG.youtube.on,
+			onChange: (value) => {
+				localStorage.setItem(`${APP_NAME}:youtube:on`, value);
+				CONFIG.youtube.on = value;
+			}
+		}),
+		react.createElement("span", {
+			dangerouslySetInnerHTML: {
+				__html:
+					"Set a youtube api key to see associated music videos in background of lyrics.",
+			},
+		}),
+		react.createElement(youtubeApiKey),
 		react.createElement("h2", null, "CORS Proxy Template"),
 		react.createElement("span", {
 			dangerouslySetInnerHTML: {

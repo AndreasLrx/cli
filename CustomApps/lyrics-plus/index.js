@@ -105,6 +105,10 @@ const CONFIG = {
 	providersOrder: localStorage.getItem("lyrics-plus:services-order"),
 	modes: ["karaoke", "synced", "unsynced", "genius"],
 	locked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",
+	youtube: {
+		on: getConfig("lyrics-plus:youtube:on", true),
+		apiKey: localStorage.getItem("lyrics-plus:youtube:apikey") || null,
+	}
 };
 
 try {
@@ -577,21 +581,26 @@ class LyricsContainer extends react.Component {
 				}
 			}
 		}
-		const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
 
-		const params = {
-			key: apiKey,
-			q: `${track.name} ${track.metadata.artist_name} video`,
-		};
+		const apiKey = CONFIG.youtube.apiKey;
+		if (apiKey && CONFIG.youtube.on) {
+			const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
 
-		const finalURL =
-			baseURL +
-			Object.keys(params)
-				.map((key) => `${key}=${encodeURIComponent(params[key])}`)
-				.join("&");
+			const params = {
+				key: apiKey,
+				q: `${track.name} ${track.metadata.artist_name} video`,
+			};
 
-		let result = await Spicetify.CosmosAsync.get(finalURL, null);
-		this.state.videoId = result.items?.[0]?.id?.videoId;
+			const finalURL =
+				baseURL +
+				Object.keys(params)
+					.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+					.join("&");
+
+			let result = await Spicetify.CosmosAsync.get(finalURL, null);
+			this.state.videoId = result.items?.[0]?.id?.videoId;
+			// this.state.videoId = "1zN7J64IeBo";
+		}
 
 		this.lyricsSource(tempState, finalMode);
 
@@ -1141,7 +1150,7 @@ class LyricsContainer extends react.Component {
 					{
 						className: "lyrics-lyricsContainer-LyricsUnavailableMessage",
 					},
-					this.state.isLoading ? LoadingIcon : "(• _ • )"
+					this.state.isLoading ? LoadingIcon : (this.state.videoId ? "" : "(• _ • )")
 				)
 			);
 		}
