@@ -832,13 +832,93 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 	const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 	const [position, setPosition] = useState(0);
 
-	useTrackPosition(() => {
-		const newPos = Spicetify.Player.getProgress() / 1000;
-		// Update only every 1000s
-		if (Math.abs(newPos - position) > 1) {
-			setPosition(newPos);
-		}
-	});
+
+	// Function to dynamically load Meyda from CDN
+	const loadMeyda = () => {
+		return new Promise((resolve, reject) => {
+			if (window.Meyda) {
+				console.log("Meyda already loaded.");
+				return resolve(window.Meyda);
+			}
+
+			const script = document.createElement("script");
+			script.src = "https://unpkg.com/meyda/dist/web/meyda.min.js"; // CDN version
+			script.async = true;
+			script.onload = () => {
+				console.log("Meyda loaded successfully.");
+				resolve(window.Meyda);
+			};
+			script.onerror = () => reject(new Error("Failed to load Meyda."));
+			
+			document.head.appendChild(script);
+		});
+	};
+
+	const loadYouTubeAudioSilently = async (videoId) => {
+		// Example: Load Meyda before using it
+		await loadMeyda().then((Meyda) => {
+			console.log("Meyda is ready to use:", Meyda);
+		}).catch(console.error);
+		
+		const aBeats = Spicetify.getAudioData();
+
+		const audioElement = new Audio();
+		audioElement.src = `http://localhost:3000/audio?videoId=${videoId}`;
+		audioElement.play();
+		// audioElement.muted = true; // Ensure it's silent
+
+		const audio = await aBeats;
+		const beats = audio.beats;
+		console.log(beats);
+
+		const audioContext = new AudioContext();
+		const source = audioContext.createMediaElementSource(audioElement);
+		const analyser = audioContext.createAnalyser();
+		source.connect(analyser); 
+
+		analyser.fftSize = 512;
+		const bufferLength = analyser.frequencyBinCount;
+		const dataArray = new Uint8Array(bufferLength);
+
+		// 🎵 Meyda Audio Feature Extractor
+		const featureExtractor = Meyda.createMeydaAnalyzer({
+			audioContext,
+			source,
+			bufferSize: 512,
+			featureExtractors: ["rms"], // Detects loudness
+			callback: (features) => {
+				const youtubeTime = audioElement.currentTime;
+				const spotifyTime = Spicetify.Player.getProgress() / 1000;
+
+				// Find the closest Spotify beat
+				const closestBeat = beats.reduce((prev, curr) =>
+					Math.abs(curr.start - spotifyTime) < Math.abs(prev.start - spotifyTime) ? curr : prev
+				);
+
+				// If the YouTube audio is off-sync by >1s, adjust it
+				if (Math.abs(youtubeTime - closestBeat.start) > 1) {
+					audioElement.currentTime = closestBeat.start;
+					console.log(`Resynced YouTube to beat at ${closestBeat.start}s`);
+				}
+			},
+		});
+
+		featureExtractor.start();
+		
+		// Start playback (silent)
+		audioElement.play().catch((err) => console.warn("Silent playback error:", err));
+
+		return audioElement;
+	};
+
+	// useTrackPosition(() => {
+	// 	const newPos = Spicetify.Player.getProgress() / 1000;
+	// 	// Update only every 1000s
+	// 	if (Math.abs(newPos - position) > 1) {
+	// 		setPosition(newPos);
+	// 	}
+	// });
+	
 
 	// Load IFrame API and IFrame Player
 	useEffect(() => {
@@ -873,6 +953,7 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 						'onReady': (event) => { 
 							document.querySelector('.lyrics-lyricsContainer-Provider').style.background = 'transparent';
 							playerRef.current.player = event.target; 
+							loadYouTubeAudioSilently(videoId);
 						},
 					},
 				});
@@ -899,14 +980,14 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 	}, [isScriptLoaded]);
 
 	// Synchronize track progress
-	useEffect(() => {
-		const player = playerRef.current?.player;
-		if (!player)
-			return;
+	// useEffect(() => {
+	// 	const player = playerRef.current?.player;
+	// 	if (!player)
+	// 		return;
 
-		if (Math.abs(position - player.getCurrentTime()) > 1)
-			playerRef.current?.player?.seekTo(position, !Spicetify.Player.data.isPaused);
-	}, [position]);
+	// 	if (Math.abs(position - player.getCurrentTime()) > 1)
+	// 		playerRef.current?.player?.seekTo(position, !Spicetify.Player.data.isPaused);
+	// }, [position]);
 
 	// Synchronize Play/Pause events
 	useEffect(() => {

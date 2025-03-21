@@ -374,22 +374,22 @@ class LyricsContainer extends react.Component {
 
 		const apiKey = CONFIG.youtube.apiKey;
 		if (apiKey && CONFIG.youtube.on) {
-			const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
+			// const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
 
-			const params = {
-				key: apiKey,
-				q: `${track.name} ${track.metadata.artist_name} video`,
-			};
+			// const params = {
+			// 	key: apiKey,
+			// 	q: `${track.name} ${track.metadata.artist_name} video`,
+			// };
 
-			const finalURL =
-				baseURL +
-				Object.keys(params)
-					.map((key) => `${key}=${encodeURIComponent(params[key])}`)
-					.join("&");
+			// const finalURL =
+			// 	baseURL +
+			// 	Object.keys(params)
+			// 		.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+			// 		.join("&");
 
-			let result = await Spicetify.CosmosAsync.get(finalURL, null);
-			this.state.videoId = result.items?.[0]?.id?.videoId;
-			// this.state.videoId = "1zN7J64IeBo";
+			// let result = await Spicetify.CosmosAsync.get(finalURL, null);
+			// this.state.videoId = result.items?.[0]?.id?.videoId;
+			this.state.videoId = "YDDz1Er2IXA";
 		}
 
 		this.lyricsSource(tempState, finalMode);
