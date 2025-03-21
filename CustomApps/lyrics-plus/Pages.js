@@ -844,11 +844,14 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 	useEffect(() => {
 		// Function to load the YouTube IFrame API script
 		const loadYouTubeAPI = () => {
+			if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+				setIsScriptLoaded(true);
+				return;
+			}
 			const tag = document.createElement('script');
 			tag.src = 'https://www.youtube.com/iframe_api';
 			window.onYouTubeIframeAPIReady = () => setIsScriptLoaded(true);
 			document.body.appendChild(tag);
-
 		};
 
 		// Function to initialize the YouTube player
@@ -867,7 +870,10 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 						'iv_load_policy': 3,
 					},
 					events: {
-						'onReady': (event) => { playerRef.current.player = event.target; },
+						'onReady': (event) => { 
+							document.querySelector('.lyrics-lyricsContainer-Provider').style.background = 'transparent';
+							playerRef.current.player = event.target; 
+						},
 					},
 				});
 			}
@@ -880,11 +886,14 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 			initializePlayer();
 		}
 
-		// Cleanup function to remove the script tag when the component unmounts
 		return () => {
-			const scriptTag = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-			if (scriptTag) {
-				document.body.removeChild(scriptTag);
+			if (isScriptLoaded && playerRef.current) {
+				if (playerRef.current.player) {
+					playerRef.current.player.stopVideo();
+					playerRef.current.player.destroy();
+				}
+				playerRef.current.destroy();
+				playerRef.current = null;
 			}
 		};
 	}, [isScriptLoaded]);
@@ -906,18 +915,17 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 			if (!data)
 				return;
 			if (data.isPaused)
-				playerRef.current.player?.pauseVideo();
+				playerRef.current?.player?.pauseVideo();
 			else
-				playerRef.current.player?.playVideo();
+				playerRef.current?.player?.playVideo();
 		};
 
 		Spicetify.Player.addEventListener("onplaypause", syncPlayPause);
 		return () => Spicetify.Player.removeEventListener("onplaypause", syncPlayPause);
-	});
+	}, []);
 
 	return react.createElement("div",
 		{
-			id: `youtube-player-${videoId}`,
 			style: {
 				position: 'absolute',
 				top: 0,
@@ -925,7 +933,14 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 				width: '100%',
 				height: '100%',
 			},
-		}
+		},
+		react.createElement("div", {
+			id: `youtube-player-${videoId}`,
+			style: {
+				width: '100%',
+				height: '100%',
+			},
+		})
 	);
 
 });
