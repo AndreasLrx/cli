@@ -494,6 +494,49 @@ class LyricsContainer extends react.Component {
 		return finalData;
 	}
 
+	parseISODuration(iso) {
+		const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+		const hours = parseInt(match[1] || 0);
+		const minutes = parseInt(match[2] || 0);
+		const seconds = parseInt(match[3] || 0);
+		return hours * 3600 + minutes * 60 + seconds;
+	}
+
+	computeYouTubeConfidence({ youtubeVideo, spotifyTrack }) {
+		const { title, channelTitle, durationSeconds, description } = youtubeVideo;
+		const { name: trackName, artist_name: artistName, durationMs } = spotifyTrack;
+
+		let score = 0;
+		const maxScore = 100;
+
+		const lowerTitle = title.toLowerCase();
+		const lowerArtist = artistName.toLowerCase();
+		const lowerTrack = trackName.toLowerCase();
+
+		// 1. Title contains both track and artist
+		if (lowerTitle.includes(lowerTrack)) score += 30;
+		if (lowerTitle.includes(lowerArtist)) score += 30;
+
+		// 2. Channel relevance (official artist channel or VEVO)
+		if (/vevo|official/i.test(channelTitle)) score += 15;
+		else if (channelTitle.toLowerCase().includes(lowerArtist)) score += 10;
+
+		// 3. Duration match (±5 seconds tolerance)
+		const spotifyDurationSec = durationMs / 1000;
+		const durationDiff = durationSeconds - spotifyDurationSec;
+		if (durationDiff < 0)
+			score -= 30; // Penalize if YouTube duration is shorter than Spotify
+		else if (durationDiff < 5) score += 15;
+		else if (durationDiff < 10) score += 10;
+		else if (durationDiff < 20) score += 5;
+
+		// 4. Metadata match (optional, but helps)
+		const metadata = `${description}`.toLowerCase();
+		if (metadata.includes(lowerTrack) && metadata.includes(lowerArtist)) score += 10;
+
+		return Math.min(score, maxScore);
+	}
+
 	async fetchLyrics(track, mode = -1, refresh = false) {
 		const info = this.infoFromTrack(track);
 		if (!info) {
@@ -599,6 +642,44 @@ class LyricsContainer extends react.Component {
 
 			let result = await Spicetify.CosmosAsync.get(finalURL, null);
 			this.state.videoId = result.items?.[0]?.id?.videoId;
+
+			if (this.state.videoId) {
+				const baseURL = "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&"
+				const params = {
+					key: apiKey,
+					id: this.state.videoId,
+				};
+				const finalURL =
+					baseURL +
+					Object.keys(params)
+						.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+						.join("&");
+
+				result = await Spicetify.CosmosAsync.get(finalURL, null);
+				const result_entry = result.items?.[0];
+
+				const title = result_entry["snippet"]?.title || "";
+				const channelTitle = result_entry["snippet"]?.channelTitle || "";
+				const durationSeconds = this.parseISODuration(result_entry["contentDetails"]?.duration || "");
+				const description = result_entry["snippet"]?.description || "";
+
+				const confidenceScore = this.computeYouTubeConfidence({
+					youtubeVideo: {
+						title,
+						channelTitle,
+						durationSeconds,
+						description
+					},
+					spotifyTrack: {
+						name: track.name,
+						artist_name: track.metadata.artist_name,
+						durationMs: track.duration.milliseconds
+					}
+				});
+				// If confidence score is too low, consider we didn't find the video
+				if (confidenceScore < 70)
+					this.state.videoId = null;
+			}
 			// this.state.videoId = "1zN7J64IeBo";
 		}
 
