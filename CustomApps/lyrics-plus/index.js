@@ -625,62 +625,72 @@ class LyricsContainer extends react.Component {
 			}
 		}
 
-		const apiKey = CONFIG.youtube.apiKey;
-		if (apiKey && CONFIG.youtube.on) {
-			const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
+		if (CONFIG.youtube.on) {
+			const track_id = info.uri.split(":")[2];
+			const resolveUrl = `https://spotifyytsync.onrender.com/track/${track_id}?resolve=true`;
 
-			const params = {
-				key: apiKey,
-				q: `${track.name} ${track.metadata.artist_name} video`,
-			};
+			let result = await Spicetify.CosmosAsync.get(resolveUrl, null);
+			let videoId = result?.youtube_video_id || null;
+			let confidence = result?.confidence || null;
 
-			const finalURL =
-				baseURL +
-				Object.keys(params)
-					.map((key) => `${key}=${encodeURIComponent(params[key])}`)
-					.join("&");
+			// If the server has rate limit, we will try to fetch the videoId from YouTube API ourselves and help the server to reduce the load.
+			if (!videoId && result?.status != "NOT_FOUND" && CONFIG.youtube.apiKey) {
+				const apiKey = CONFIG.youtube.apiKey;
+				const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
 
-			let result = await Spicetify.CosmosAsync.get(finalURL, null);
-			this.state.videoId = result.items?.[0]?.id?.videoId;
-
-			if (this.state.videoId) {
-				const baseURL = "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&"
 				const params = {
 					key: apiKey,
-					id: this.state.videoId,
+					q: `${track.name} ${track.metadata.artist_name} video`,
 				};
+
 				const finalURL =
 					baseURL +
 					Object.keys(params)
 						.map((key) => `${key}=${encodeURIComponent(params[key])}`)
 						.join("&");
 
-				result = await Spicetify.CosmosAsync.get(finalURL, null);
-				const result_entry = result.items?.[0];
+				let result = await Spicetify.CosmosAsync.get(finalURL, null);
+				videoId = result.items?.[0]?.id?.videoId;
 
-				const title = result_entry["snippet"]?.title || "";
-				const channelTitle = result_entry["snippet"]?.channelTitle || "";
-				const durationSeconds = this.parseISODuration(result_entry["contentDetails"]?.duration || "");
-				const description = result_entry["snippet"]?.description || "";
+				if (videoId) {
+					const baseURL = "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&"
+					const params = {
+						key: apiKey,
+						id: videoId,
+					};
+					const finalURL =
+						baseURL +
+						Object.keys(params)
+							.map((key) => `${key}=${encodeURIComponent(params[key])}`)
+							.join("&");
 
-				const confidenceScore = this.computeYouTubeConfidence({
-					youtubeVideo: {
-						title,
-						channelTitle,
-						durationSeconds,
-						description
-					},
-					spotifyTrack: {
-						name: track.name,
-						artist_name: track.metadata.artist_name,
-						durationMs: track.duration.milliseconds
-					}
-				});
-				// If confidence score is too low, consider we didn't find the video
-				if (confidenceScore < 70)
-					this.state.videoId = null;
+					result = await Spicetify.CosmosAsync.get(finalURL, null);
+					const result_entry = result.items?.[0];
+
+					const title = result_entry["snippet"]?.title || "";
+					const channelTitle = result_entry["snippet"]?.channelTitle || "";
+					const durationSeconds = this.parseISODuration(result_entry["contentDetails"]?.duration || "");
+					const description = result_entry["snippet"]?.description || "";
+
+					confidence = this.computeYouTubeConfidence({
+						youtubeVideo: {
+							title,
+							channelTitle,
+							durationSeconds,
+							description
+						},
+						spotifyTrack: {
+							name: track.name,
+							artist_name: track.metadata.artist_name,
+							durationMs: track.duration.milliseconds
+						}
+					});
+				}
 			}
-			// this.state.videoId = "1zN7J64IeBo";
+			if (videoId && confidence > 40) {
+				// If we have a videoId and confidence is high enough, we can use it
+				this.state.videoId = videoId;
+			}
 		}
 
 		this.lyricsSource(tempState, finalMode);
