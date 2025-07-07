@@ -892,7 +892,7 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 			// 	document.body.removeChild(scriptTag);
 			// }
 		};
-	}, [isScriptLoaded]);
+	}, [isScriptLoaded, videoId]);
 
 	// Synchronize track progress
 	useEffect(() => {
@@ -920,9 +920,10 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 		return () => Spicetify.Player.removeEventListener("onplaypause", syncPlayPause);
 	});
 
-	return react.createElement("div",
+	return react.createElement(
+		"div",
 		{
-			id: `youtube-player-${videoId}`,
+			id: `youtube-player-wrapper`,
 			style: {
 				position: 'absolute',
 				top: 0,
@@ -930,7 +931,19 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 				width: '100%',
 				height: '100%',
 			},
-		}
+		},
+		react.createElement("div",
+			{
+				id: `youtube-player-${videoId}`,
+				style: {
+					position: 'absolute',
+					top: 0,
+					left: 0,
+					width: '100%',
+					height: '100%',
+				},
+			}
+		)
 	);
 
 });
