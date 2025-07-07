@@ -687,9 +687,12 @@ class LyricsContainer extends react.Component {
 					});
 				}
 			}
+			// If we have a videoId and confidence is high enough, we can use it
 			if (videoId && confidence > 40) {
-				// If we have a videoId and confidence is high enough, we can use it
 				this.state.videoId = videoId;
+			// If we don't have a videoId or confidence is low, we set it to null
+			} else {
+				this.state.videoId = null; 
 			}
 		}
 
