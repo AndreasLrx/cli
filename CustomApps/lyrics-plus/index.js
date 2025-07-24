@@ -1256,7 +1256,7 @@ class LyricsContainer extends react.Component {
 			{
 				className: `lyrics-lyricsContainer-LyricsContainer${CONFIG.visual["fade-blur"] ? " blur-enabled" : ""}${
 					fadLyricsContainer ? " fad-enabled" : ""
-				}`,
+				}${this.state.videoId ? " lyrics-lyricsContainer-YouTube" : ""}`,
 				style: this.styleVariables,
 				ref: (el) => {
 					if (!el) return;
