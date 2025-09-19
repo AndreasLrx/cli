@@ -108,6 +108,7 @@ const CONFIG = {
 	youtube: {
 		on: getConfig("lyrics-plus:youtube:on", true),
 		apiKey: localStorage.getItem("lyrics-plus:youtube:apikey") || null,
+		syncServerUrl: localStorage.getItem("lyrics-plus:youtube:sync-server-url") || null,
 	}
 };
 
@@ -627,9 +628,9 @@ class LyricsContainer extends react.Component {
 
 		if (CONFIG.youtube.on) {
 			const track_id = info.uri.split(":")[2];
-			const resolveUrl = `https://spotifyytsync.onrender.com/track/${track_id}?resolve=true`;
+			const resolveUrl = CONFIG.youtube.syncServerUrl ? `${CONFIG.youtube.syncServerUrl}/track/${track_id}?resolve=true` : null;
 
-			let result = await Spicetify.CosmosAsync.get(resolveUrl, null);
+			let result = resolveUrl ? await Spicetify.CosmosAsync.get(resolveUrl, null) : null;
 			let videoId = result?.youtube_video_id || null;
 			let confidence = result?.confidence || null;
 

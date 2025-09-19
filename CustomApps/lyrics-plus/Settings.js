@@ -518,6 +518,23 @@ const youtubeApiKey = () => {
 	});
 };
 
+const youtubeSyncServerUrl = () => {
+	const [syncUrl, setSyncUrl] = react.useState(localStorage.getItem("lyrics-plus:youtube:sync-server-url") || "");
+
+	return react.createElement("input", {
+		placeholder: "Youtube Sync Server URL",
+		value: syncUrl,
+		onChange: (event) => {
+			const value = event.target.value;
+			setSyncUrl(value);
+
+			if (value === "" || !value) return localStorage.removeItem("lyrics-plus:youtube:sync-server-url");
+			localStorage.setItem("lyrics-plus:youtube:sync-server-url", value);
+		},
+	});
+};
+
+
 const OptionList = ({ type, items, onChange }) => {
 	const [itemList, setItemList] = useState(items);
 	const [, forceUpdate] = useState();
@@ -741,6 +758,13 @@ function openConfig() {
 			},
 		}),
 		react.createElement(youtubeApiKey),
+		react.createElement("span", {
+			dangerouslySetInnerHTML: {
+				__html:
+					"Set a youtube video sync server URL to see associated music videos in background of lyrics.",
+			},
+		}),
+		react.createElement(youtubeSyncServerUrl),
 		react.createElement("h2", null, "CORS Proxy Template"),
 		react.createElement("span", {
 			dangerouslySetInnerHTML: {
