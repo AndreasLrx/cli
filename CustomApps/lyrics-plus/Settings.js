@@ -271,8 +271,21 @@ const ConfigInput = ({ name, defaultValue, onChange = () => {} }) => {
 	);
 };
 
-const ConfigAdjust = ({ name, value, defaultValue, step, min, max, onChange = () => {} }) => {
+const ConfigAdjust = ({ 
+	name, 
+	value, 
+	defaultValue, 
+	step, 
+	ctrlStep,      // Optional: specific value for Ctrl+click
+	shiftStep,     // Optional: specific value for Shift+click
+	min, 
+	max, 
+	onChange = () => {} 
+}) => {
 	const [internalValue, setInternalValue] = useState(value ?? defaultValue);
+	const [isEditing, setIsEditing] = useState(false);
+	const [editValue, setEditValue] = useState('');
+	const inputRef = react.useRef(null);
 
 	// Update internal state when value prop changes
 	react.useEffect(() => {
@@ -281,16 +294,77 @@ const ConfigAdjust = ({ name, value, defaultValue, step, min, max, onChange = ()
 		}
 	}, [value]);
 
-	function adjust(dir) {
-		let temp = internalValue + dir * step;
+	// Focus input when editing starts
+	react.useEffect(() => {
+		if (isEditing && inputRef.current) {
+			inputRef.current.focus();
+			inputRef.current.select();
+		}
+	}, [isEditing]);
+
+	function adjust(dir, event) {
+		let effectiveStep = step;
+
+		// Determine step based on modifier keys
+		if (event?.ctrlKey || event?.metaKey) {
+			// Use custom ctrlStep if provided, otherwise 10x default
+			effectiveStep = ctrlStep !== undefined ? ctrlStep : step * 10;
+		} else if (event?.shiftKey) {
+			// Use custom shiftStep if provided, otherwise 100x default
+			effectiveStep = shiftStep !== undefined ? shiftStep : step * 100;
+		}
+
+		let temp = internalValue + dir * effectiveStep;
+		
+		// Clamp to min/max
 		if (temp < min) {
 			temp = min;
 		} else if (temp > max) {
 			temp = max;
 		}
+		
 		setInternalValue(temp);
 		onChange(temp);
 	}
+
+	function startEdit() {
+		setEditValue(String(internalValue));
+		setIsEditing(true);
+	}
+
+	function handleKeyDown(e) {
+		if (e.key === 'Enter') {
+			finishEdit();
+		} else if (e.key === 'Escape') {
+			setIsEditing(false);
+		}
+	}
+
+	function finishEdit() {
+		const numValue = Number(editValue);
+		if (!isNaN(numValue)) {
+			let temp = numValue;
+			if (temp < min) temp = min;
+			if (temp > max) temp = max;
+			setInternalValue(temp);
+			onChange(temp);
+		}
+		setIsEditing(false);
+	}
+
+	// Build tooltip text
+	const tooltipParts = ["Click to edit"];
+	if (ctrlStep !== undefined) {
+		tooltipParts.push(`Ctrl+click for ±${ctrlStep}`);
+	} else {
+		tooltipParts.push(`Ctrl+click for ±${step * 10}`);
+	}
+	if (shiftStep !== undefined) {
+		tooltipParts.push(`Shift+click for ±${shiftStep}`);
+	} else {
+		tooltipParts.push(`Shift+click for ±${step * 100}`);
+	}
+
 	return react.createElement(
 		"div",
 		{
@@ -310,19 +384,47 @@ const ConfigAdjust = ({ name, value, defaultValue, step, min, max, onChange = ()
 			},
 			react.createElement(SwapButton, {
 				icon: `<path d="M2 7h12v2H0z"/>`,
-				onClick: () => adjust(-1),
+				onClick: (e) => adjust(-1, e),
 				disabled: internalValue === min,
 			}),
-			react.createElement(
-				"p",
-				{
-					className: "adjust-value",
-				},
-				internalValue
-			),
+			isEditing 
+				? react.createElement(
+					"input",
+					{
+						ref: inputRef,
+						type: "number",
+						className: "adjust-value-input",
+						value: editValue,
+						onChange: (e) => setEditValue(e.target.value),
+						onKeyDown: handleKeyDown,
+						onBlur: finishEdit,
+						style: {
+							width: '60px',
+							textAlign: 'center',
+							background: 'var(--spice-button)',
+							color: 'var(--spice-text)',
+							border: '1px solid var(--spice-button-active)',
+							borderRadius: '4px',
+							padding: '2px 4px',
+						}
+					}
+				)
+				: react.createElement(
+					"p",
+					{
+						className: "adjust-value",
+						onClick: startEdit,
+						style: {
+							cursor: 'pointer',
+							userSelect: 'none',
+						},
+						title: tooltipParts.join(", ")
+					},
+					internalValue
+				),
 			react.createElement(SwapButton, {
 				icon: Spicetify.SVGIcons.plus2px,
-				onClick: () => adjust(1),
+				onClick: (e) => adjust(1, e),
 				disabled: internalValue === max,
 			})
 		)

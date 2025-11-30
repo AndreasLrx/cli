@@ -428,7 +428,9 @@ const MusicVideoMenu = react.memo(() => {
 			type: ConfigAdjust,
 			min: Number.NEGATIVE_INFINITY,
 			max: Number.POSITIVE_INFINITY,
-			step: 250,
+			step: 100,
+			ctrlStep: 5000,
+			shiftStep: 1000,
 			value: associatedVideo?.delay_ms ?? 0,
 			when: () => associatedVideo?.youtube_video_id,
 			onChange: (name, value) => {

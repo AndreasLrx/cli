@@ -832,6 +832,8 @@ const YouTubeVideo = react.memo(() => {
 	const playerRef = useRef(null);
 	const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 	const delayRef = useRef(associatedVideo.delay_ms || 0); // Use a ref to keep current delay
+	const isSyncingRef = useRef(false);
+	const lastSeekTimeRef = useRef(0);
 
 	useEffect(() => {
 		delayRef.current = associatedVideo.delay_ms || 0;
@@ -840,12 +842,35 @@ const YouTubeVideo = react.memo(() => {
 	// Synchronize track progress
 	useTrackPosition(() => {
 		const player = playerRef.current?.player;
-		if (!player)
-			return;
+		if (!player || isSyncingRef.current) return;
 
-		const position = (Spicetify.Player.getProgress() + delayRef.current) / 1000;
-		if (Math.abs(position - player.getCurrentTime()) > 1)
-			playerRef.current?.player?.seekTo(position, !Spicetify.Player.data.isPaused);
+		const spotifyPosition = (Spicetify.Player.getProgress() + delayRef.current) / 1000;
+		const youtubePosition = player.getCurrentTime();
+		const drift = spotifyPosition - youtubePosition;
+
+		// Different thresholds based on situation
+		let threshold;
+		if (Spicetify.Player.data.isPaused) {
+			threshold = 0.05; // Very tight when paused (visual sync)
+		} else if (Math.abs(drift) < 0.5) {
+			threshold = 0.3; // Medium tolerance when close
+		} else {
+			threshold = 0.1; // Tighter when far off
+		}
+
+		if (Math.abs(drift) > threshold) {
+			const now = Date.now();
+			// Only seek once per second during playback
+			if (now - lastSeekTimeRef.current > 1000) {
+				isSyncingRef.current = true;
+				lastSeekTimeRef.current = now;
+				
+				// Add small prediction: account for seek delay (~100ms)
+				player.seekTo(spotifyPosition + 0.1, true);
+				
+				setTimeout(() => isSyncingRef.current = false, 200);
+			}
+		}
 	});
 
 	// Load IFrame API and IFrame Player
