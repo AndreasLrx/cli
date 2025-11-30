@@ -772,6 +772,30 @@ function openConfig() {
 			},
 		}),
 		react.createElement(youtubeSyncServerUrl),
+		react.createElement(ConfigSlider, {
+			name: "Show cover music videos",
+			defaultValue: CONFIG.youtube.allowCoverVideos,
+			onChange: (value) => {
+				localStorage.setItem(`${APP_NAME}:youtube:allow-cover-videos`, value);
+				CONFIG.youtube.allowCoverVideos = value;
+			}
+		}),
+		react.createElement(ConfigSlider, {
+			name: "Show lyrics music videos",
+			defaultValue: CONFIG.youtube.allowLyricsVideos,
+			onChange: (value) => {
+				localStorage.setItem(`${APP_NAME}:youtube:allow-lyrics-videos`, value);
+				CONFIG.youtube.allowLyricsVideos = value;
+			}
+		}),
+		react.createElement(ConfigSlider, {
+			name: "Hide spotify lyrics for lyrics music videos",
+			defaultValue: CONFIG.youtube.hideLyricsForLyricsVideo,
+			onChange: (value) => {
+				localStorage.setItem(`${APP_NAME}:youtube:hide-lyrics-for-lyrics-videos`, value);
+				CONFIG.youtube.hideLyricsForLyricsVideo = value;
+			}
+		}),
 		react.createElement("h2", null, "CORS Proxy Template"),
 		react.createElement("span", {
 			dangerouslySetInnerHTML: {

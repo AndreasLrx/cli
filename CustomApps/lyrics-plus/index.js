@@ -109,6 +109,9 @@ const CONFIG = {
 		on: getConfig("lyrics-plus:youtube:on", true),
 		apiKey: localStorage.getItem("lyrics-plus:youtube:apikey") || null,
 		syncServerUrl: localStorage.getItem("lyrics-plus:youtube:sync-server-url") || null,
+		allowCoverVideos: localStorage.getItem("lyrics-plus:youtube:allow-cover-videos") || null,
+		allowLyricsVideos: localStorage.getItem("lyrics-plus:youtube:allow-lyrics-videos") || null,
+		hideLyricsForLyricsVideo: localStorage.getItem("lyrics-plus:youtube:hide-lyrics-for-lyrics-videos") || true,
 	}
 };
 
@@ -647,7 +650,7 @@ class LyricsContainer extends react.Component {
 
 			/** @type {YoutubeAssociatedVideo|null} */
 			let associatedVideo = resolveUrl ? await Spicetify.CosmosAsync.get(resolveUrl, null) : null;
-			if (!associatedVideo)
+			if (!associatedVideo || associatedVideo.is_restricted)
 				this.setState({associatedVideo: defaultVideo});
 			else {
 			// If the server has rate limit, we will try to fetch the videoId from YouTube API ourselves and help the server to reduce the load.
@@ -1206,7 +1209,10 @@ class LyricsContainer extends react.Component {
 		const hasMusixmatchLanguages = Array.isArray(this.state.musixmatchAvailableTranslations) && this.state.musixmatchAvailableTranslations.length > 0;
 		const hasTranslation = this.state.neteaseTranslation !== null || this.state.musixmatchTranslation !== null || hasMusixmatchLanguages;
 
-		if (mode !== -1) {
+		const showVideo = this.state.associatedVideo.youtube_video_id && !(
+			(this.state.associatedVideo.video_type == "Cover" && !CONFIG.youtube.allowCoverVideos) ||
+			(this.state.associatedVideo.video_type == "Lyrics" && !CONFIG.youtube.allowLyricsVideos))
+		if (mode !== -1 && (!showVideo || (this.state.associatedVideo?.video_type != "Lyrics") || !CONFIG.youtube.hideLyricsForLyricsVideo)) {
 			showTranslationButton = (friendlyLanguage || hasTranslation) && (mode === SYNCED || mode === UNSYNCED);
 
 			if (mode === KARAOKE && this.state.karaoke) {
@@ -1263,7 +1269,7 @@ class LyricsContainer extends react.Component {
 					{
 						className: "lyrics-lyricsContainer-LyricsUnavailableMessage",
 					},
-					this.state.isLoading ? LoadingIcon : (this.state.associatedVideo.youtube_video_id ? "" : "(• _ • )")
+					this.state.isLoading ? LoadingIcon : (showVideo ? "" : "(• _ • )")
 				)
 			);
 		}
@@ -1309,7 +1315,7 @@ class LyricsContainer extends react.Component {
 			{
 				className: `lyrics-lyricsContainer-LyricsContainer${CONFIG.visual["fade-blur"] ? " blur-enabled" : ""}${
 					fadLyricsContainer ? " fad-enabled" : ""
-			}${this.state.associatedVideo.youtube_video_id ? " lyrics-lyricsContainer-YouTube" : ""}`,
+			}${showVideo ? " lyrics-lyricsContainer-YouTube" : ""}`,
 				style: this.styleVariables,
 				ref: (el) => {
 					if (!el) return;
@@ -1319,7 +1325,7 @@ class LyricsContainer extends react.Component {
 			react.createElement("div",
 				{
 					className: 'lyrics-lyricsContainer-LyricsBackground',
-				style: this.state.associatedVideo.youtube_video_id ? {
+				style: showVideo ? {
 						height: "80vh",
 						position: "sticky",
 						bottom: "0px",
@@ -1328,7 +1334,7 @@ class LyricsContainer extends react.Component {
 						marginTop: "-80vh",
 					} : {}
 				},
-			this.state.associatedVideo.youtube_video_id &&
+			showVideo &&
 				react.createElement(YouTubeVideo, null)
 			),
 			react.createElement(
