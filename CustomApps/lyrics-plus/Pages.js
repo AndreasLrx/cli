@@ -827,17 +827,25 @@ const VersionSelector = react.memo(({ items, index, callback }) => {
 	);
 });
 
-const YouTubeVideo = react.memo(({ videoId }) => {
+const YouTubeVideo = react.memo(() => {
+	const { associatedVideo } = react.useContext(VideoContext);
 	const playerRef = useRef(null);
 	const [isScriptLoaded, setIsScriptLoaded] = useState(false);
-	const [position, setPosition] = useState(0);
+	const delayRef = useRef(associatedVideo.delay_ms || 0); // Use a ref to keep current delay
 
+	useEffect(() => {
+		delayRef.current = associatedVideo.delay_ms || 0;
+	}, [associatedVideo.delay_ms]);
+
+	// Synchronize track progress
 	useTrackPosition(() => {
-		const newPos = Spicetify.Player.getProgress() / 1000;
-		// Update only every 1000s
-		if (Math.abs(newPos - position) > 1) {
-			setPosition(newPos);
-		}
+		const player = playerRef.current?.player;
+		if (!player)
+			return;
+
+		const position = (Spicetify.Player.getProgress() + delayRef.current) / 1000;
+		if (Math.abs(position - player.getCurrentTime()) > 1)
+			playerRef.current?.player?.seekTo(position, !Spicetify.Player.data.isPaused);
 	});
 
 	// Load IFrame API and IFrame Player
@@ -857,10 +865,10 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 		// Function to initialize the YouTube player
 		const initializePlayer = () => {
 			if (window.YT && window.YT.Player) {
-				playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
+				playerRef.current = new window.YT.Player(`youtube-player-${associatedVideo.youtube_video_id}`, {
 					height: '315',
 					width: '560',
-					videoId: videoId,
+					videoId: associatedVideo.youtube_video_id,
 					playerVars: {
 						'autoplay': 0,
 						'mute': 1,
@@ -887,22 +895,8 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 				playerRef.current.player.destroy();
 				playerRef.current = null;
 			}
-			// const scriptTag = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-			// if (scriptTag) {
-			// 	document.body.removeChild(scriptTag);
-			// }
 		};
-	}, [isScriptLoaded, videoId]);
-
-	// Synchronize track progress
-	useEffect(() => {
-		const player = playerRef.current?.player;
-		if (!player)
-			return;
-
-		if (Math.abs(position - player.getCurrentTime()) > 1)
-			playerRef.current?.player?.seekTo(position, !Spicetify.Player.data.isPaused);
-	}, [position]);
+	}, [isScriptLoaded, associatedVideo]);
 
 	// Synchronize Play/Pause events
 	useEffect(() => {
@@ -934,7 +928,7 @@ const YouTubeVideo = react.memo(({ videoId }) => {
 		},
 		react.createElement("div",
 			{
-				id: `youtube-player-${videoId}`,
+				id: `youtube-player-${associatedVideo.youtube_video_id}`,
 				style: {
 					position: 'absolute',
 					top: 0,

@@ -397,3 +397,110 @@ const AdjustmentsMenu = react.memo(({ mode }) => {
 		)
 	);
 });
+
+const MusicVideoMenu = react.memo(() => {
+	const { associatedVideo, updateAssociatedVideo, saveAssociatedVideo } = react.useContext(VideoContext);
+
+	const items = [
+		{
+			desc: "Video Type",
+			key: "video-type",
+			type: ConfigSelection,
+			value: associatedVideo?.video_type ?? "VIDEO",
+			options: {
+				left: "VIDEO",
+				center: "COVER",
+				right: "LYRICS",
+			},
+			when: () => associatedVideo?.youtube_video_id,
+			onChange: (name, value) => {
+				const options = {
+					left: "VIDEO",
+					center: "COVER",
+					right: "LYRICS",
+				};
+				updateAssociatedVideo({ video_type: options[value] || value });
+			}
+		},
+		{
+			desc: "Track delay",
+			key: "delay",
+			type: ConfigAdjust,
+			min: Number.NEGATIVE_INFINITY,
+			max: Number.POSITIVE_INFINITY,
+			step: 250,
+			value: associatedVideo?.delay_ms ?? 0,
+			when: () => associatedVideo?.youtube_video_id,
+			onChange: (name, value) => {
+				updateAssociatedVideo({ delay_ms: Number(value) })
+			}
+		},
+		{
+			desc: "Restricted Video",
+			key: "restricted",
+			type: ConfigSlider,
+			value: associatedVideo?.is_restricted ?? false,
+			when: () => associatedVideo?.youtube_video_id,
+			onChange: (name, value) => {
+				updateAssociatedVideo({ is_restricted: value })
+			}
+		},
+		{
+			desc: "Save",
+			text: "Save",
+			key: "save",
+			type: ConfigButton,
+			when: () => associatedVideo?.youtube_video_id,
+			onChange: () => {
+				saveAssociatedVideo();
+			},
+		},
+	]
+
+	return react.createElement(
+		Spicetify.ReactComponent.TooltipWrapper,
+		{
+			label: "Music Video Adjustments",
+		},
+		react.createElement(
+			"div",
+			{
+				className: "lyrics-tooltip-wrapper",
+			},
+			react.createElement(
+				Spicetify.ReactComponent.ContextMenu,
+				{
+					menu: react.createElement(
+						Spicetify.ReactComponent.Menu,
+						{},
+						react.createElement("h3", null, "Video Adjustments"),
+						react.createElement(OptionList, {
+							items: items,
+						}),
+					),
+					trigger: "click",
+					action: "toggle",
+					renderInline: true,
+				},
+				react.createElement(
+					"button",
+					{
+						className: "lyrics-config-button",
+					},
+					react.createElement(
+						"svg",
+						{
+							width: 16,
+							height: 16,
+							viewBox: "0 0 16 16",
+							fill: "currentColor",
+						},
+						react.createElement("path", {
+							d: "M 14 3 L 2 3 C 1.448 3 1 3.448 1 4 L 1 12 C 1 12.552 1.448 13 2 13 L 14 13 C 14.552 13 15 12.552 15 12 L 15 4 C 15 3.448 14.552 3 14 3 Z M 14 4 L 14 12 L 2 12 L 2 4 L 14 4 Z M 6.5 5.5 L 6.5 10.5 L 10.5 8 Z"
+						})
+					)
+				)
+			)
+		)
+	);
+});

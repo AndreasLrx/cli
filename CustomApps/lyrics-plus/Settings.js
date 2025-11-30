@@ -271,17 +271,24 @@ const ConfigInput = ({ name, defaultValue, onChange = () => {} }) => {
 	);
 };
 
-const ConfigAdjust = ({ name, defaultValue, step, min, max, onChange = () => {} }) => {
-	const [value, setValue] = useState(defaultValue);
+const ConfigAdjust = ({ name, value, defaultValue, step, min, max, onChange = () => {} }) => {
+	const [internalValue, setInternalValue] = useState(value ?? defaultValue);
+
+	// Update internal state when value prop changes
+	react.useEffect(() => {
+		if (value !== undefined && value !== internalValue) {
+			setInternalValue(value);
+		}
+	}, [value]);
 
 	function adjust(dir) {
-		let temp = value + dir * step;
+		let temp = internalValue + dir * step;
 		if (temp < min) {
 			temp = min;
 		} else if (temp > max) {
 			temp = max;
 		}
-		setValue(temp);
+		setInternalValue(temp);
 		onChange(temp);
 	}
 	return react.createElement(
@@ -304,19 +311,19 @@ const ConfigAdjust = ({ name, defaultValue, step, min, max, onChange = () => {} 
 			react.createElement(SwapButton, {
 				icon: `<path d="M2 7h12v2H0z"/>`,
 				onClick: () => adjust(-1),
-				disabled: value === min,
+				disabled: internalValue === min,
 			}),
 			react.createElement(
 				"p",
 				{
 					className: "adjust-value",
 				},
-				value
+				internalValue
 			),
 			react.createElement(SwapButton, {
 				icon: Spicetify.SVGIcons.plus2px,
 				onClick: () => adjust(1),
-				disabled: value === max,
+				disabled: internalValue === max,
 			})
 		)
 	);

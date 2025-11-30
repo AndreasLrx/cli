@@ -193,6 +193,21 @@ function resolveTranslationSource(source) {
 	return { key: source, language: null };
 }
 
+/** @type {YoutubeAssociatedVideo} */
+const defaultVideo = {
+    id: "",
+    title: "",
+    artist: "",
+    youtube_video_id: null,
+    confidence: null,
+    status: "UNKNOWN",
+    video_type: null,
+    is_restricted: null,
+    delay_ms: 0,
+};
+
+const VideoContext = react.createContext(null);
+
 class LyricsContainer extends react.Component {
 	constructor() {
 		super();
@@ -203,7 +218,7 @@ class LyricsContainer extends react.Component {
 			genius: null,
 			genius2: null,
 			currentLyrics: null,
-			videoId: null,
+			associatedVideo: defaultVideo,
 			romaji: null,
 			furigana: null,
 			hiragana: null,
@@ -630,12 +645,13 @@ class LyricsContainer extends react.Component {
 			const track_id = info.uri.split(":")[2];
 			const resolveUrl = CONFIG.youtube.syncServerUrl ? `${CONFIG.youtube.syncServerUrl}/track/${track_id}?resolve=true` : null;
 
-			let result = resolveUrl ? await Spicetify.CosmosAsync.get(resolveUrl, null) : null;
-			let videoId = result?.youtube_video_id || null;
-			let confidence = result?.confidence || null;
-
+			/** @type {YoutubeAssociatedVideo|null} */
+			let associatedVideo = resolveUrl ? await Spicetify.CosmosAsync.get(resolveUrl, null) : null;
+			if (!associatedVideo)
+				this.setState({associatedVideo: defaultVideo});
+			else {
 			// If the server has rate limit, we will try to fetch the videoId from YouTube API ourselves and help the server to reduce the load.
-			if (!videoId && result?.status != "NOT_FOUND" && CONFIG.youtube.apiKey) {
+				if (!associatedVideo.youtube_video_id && associatedVideo.status != "NOT_FOUND" && CONFIG.youtube.apiKey) {
 				const apiKey = CONFIG.youtube.apiKey;
 				const baseURL = "https://www.googleapis.com/youtube/v3/search?maxResults=1&type=video&videoEmbeddable=true&";
 
@@ -651,7 +667,7 @@ class LyricsContainer extends react.Component {
 						.join("&");
 
 				let result = await Spicetify.CosmosAsync.get(finalURL, null);
-				videoId = result.items?.[0]?.id?.videoId;
+				let videoId = result.items?.[0]?.id?.videoId;
 
 				if (videoId) {
 					const baseURL = "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&"
@@ -673,7 +689,8 @@ class LyricsContainer extends react.Component {
 					const durationSeconds = this.parseISODuration(result_entry["contentDetails"]?.duration || "");
 					const description = result_entry["snippet"]?.description || "";
 
-					confidence = this.computeYouTubeConfidence({
+						associatedVideo.youtube_video_id = videoId;
+						associatedVideo.confidence = this.computeYouTubeConfidence({
 						youtubeVideo: {
 							title,
 							channelTitle,
@@ -689,11 +706,12 @@ class LyricsContainer extends react.Component {
 				}
 			}
 			// If we have a videoId and confidence is high enough, we can use it
-			if (videoId && confidence > 40) {
-				this.state.videoId = videoId;
+				// Also we don't keep restricted videos as we won't be able to play it
+				if (!associatedVideo.is_restricted && associatedVideo.youtube_video_id && associatedVideo.confidence > 40) {
+					this.setState({associatedVideo: associatedVideo});
 			// If we don't have a videoId or confidence is low, we set it to null
-			} else {
-				this.state.videoId = null; 
+				} else
+					this.setState({associatedVideo: defaultVideo});
 			}
 		}
 
@@ -1245,7 +1263,7 @@ class LyricsContainer extends react.Component {
 					{
 						className: "lyrics-lyricsContainer-LyricsUnavailableMessage",
 					},
-					this.state.isLoading ? LoadingIcon : (this.state.videoId ? "" : "(• _ • )")
+					this.state.isLoading ? LoadingIcon : (this.state.associatedVideo.youtube_video_id ? "" : "(• _ • )")
 				)
 			);
 		}
@@ -1253,11 +1271,45 @@ class LyricsContainer extends react.Component {
 		this.state.mode = mode;
 
 		const out = react.createElement(
+			VideoContext.Provider,
+			{
+				value: {
+					associatedVideo: this.state.associatedVideo,
+					updateAssociatedVideo: (partial) => {
+						this.setState(prev => {
+							const newState = {
+								associatedVideo: { ...prev.associatedVideo, ...partial }
+							};
+							return newState;
+						});
+					},
+					saveAssociatedVideo: async () => {
+						const { associatedVideo } = this.state;
+						if (!associatedVideo?.id) return;
+
+						try {
+							const track_id = associatedVideo.id;
+							const saveUrl = `${CONFIG.youtube.syncServerUrl}/track/${track_id}`;
+							
+							await Spicetify.CosmosAsync.post(saveUrl, {
+								delay_ms: associatedVideo.delay_ms,
+								video_type: associatedVideo.video_type,
+								is_restricted: associatedVideo.is_restricted
+							});
+							Spicetify.showNotification("Video settings saved");
+						} catch (error) {
+							console.error("Failed to save video settings:", error);
+							Spicetify.showNotification("Failed to save settings", true);
+						}
+					}
+				}
+			},
+			react.createElement(
 			"div",
 			{
 				className: `lyrics-lyricsContainer-LyricsContainer${CONFIG.visual["fade-blur"] ? " blur-enabled" : ""}${
 					fadLyricsContainer ? " fad-enabled" : ""
-				}${this.state.videoId ? " lyrics-lyricsContainer-YouTube" : ""}`,
+			}${this.state.associatedVideo.youtube_video_id ? " lyrics-lyricsContainer-YouTube" : ""}`,
 				style: this.styleVariables,
 				ref: (el) => {
 					if (!el) return;
@@ -1267,7 +1319,7 @@ class LyricsContainer extends react.Component {
 			react.createElement("div",
 				{
 					className: 'lyrics-lyricsContainer-LyricsBackground',
-					style: this.state.videoId ? {
+				style: this.state.associatedVideo.youtube_video_id ? {
 						height: "80vh",
 						position: "sticky",
 						bottom: "0px",
@@ -1276,16 +1328,16 @@ class LyricsContainer extends react.Component {
 						marginTop: "-80vh",
 					} : {}
 				},
-				this.state.videoId &&
-				react.createElement(YouTubeVideo, {
-					videoId: this.state.videoId
-				})
+			this.state.associatedVideo.youtube_video_id &&
+				react.createElement(YouTubeVideo, null)
 			),
 			react.createElement(
 				"div",
 				{
 					className: "lyrics-config-button-container",
 				},
+			this.state.associatedVideo.youtube_video_id &&
+				react.createElement(MusicVideoMenu, null),
 				showTranslationButton &&
 					react.createElement(TranslationMenu, {
 						friendlyLanguage,
@@ -1397,6 +1449,7 @@ class LyricsContainer extends react.Component {
 						localStorage.setItem("lyrics-plus:lock-mode", mode);
 					},
 				})
+	)
 		);
 
 		if (this.state.isFullscreen) return reactDOM.createPortal(out, this.fullscreenContainer);
